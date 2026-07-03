@@ -1,13 +1,9 @@
-import os
-from dotenv import load_dotenv
+from app.core.config import GEMINI_API_KEY
 
-load_dotenv()
 
 
 def get_gemini_api_key() -> str:
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    if not api_key:
+    if not GEMINI_API_KEY:
         raise ValueError("Gemini API Key not found.")
 
-    return api_key
+    return GEMINI_API_KEY

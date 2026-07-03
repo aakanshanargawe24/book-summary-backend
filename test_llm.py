@@ -1,4 +1,4 @@
-from app.services.llm import LLM
+from app.clients.llm import LLM
 
 llm = LLM()
 

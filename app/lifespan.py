@@ -1,17 +1,18 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
 
-from app.database.connection import Base, engine
-from app.models.books import Book
+from app.database.connection import Base, book_engine
+# Import all models
+from app.models import *
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
+    print("Creating database tables...")
 
-    print("Application Starting...")
+    Base.metadata.create_all(bind=book_engine)
 
-    Base.metadata.create_all(bind=engine)
+    print("Database is ready.")
 
     yield
 
-    print("Application Closing...")
+    print("Application shutting down...")

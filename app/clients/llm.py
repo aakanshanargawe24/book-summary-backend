@@ -1,25 +1,24 @@
-
 from google import genai
 
 from app.utils.api_keys import get_gemini_api_key
 
 
-class LLM:
+class LLMClient:
 
     def __init__(self):
-        self.client = genai.Client(
+        self.gemini_client = genai.Client(
             api_key=get_gemini_api_key()
         )
 
-    def generate(
+    def generate_content(
         self,
         prompt: str,
         model: str = "gemini-2.5-flash"
     ) -> str:
 
-        response = self.client.models.generate_content(
+        llm_response = self.gemini_client.models.generate_content(
             model=model,
             contents=prompt
         )
 
-        return response.text
+        return llm_response.text
