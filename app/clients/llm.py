@@ -15,10 +15,12 @@ class LLMClient:
         prompt: str,
         model: str = "gemini-2.5-flash"
     ) -> str:
+        print("Calling Gemini API...")
 
         llm_response = self.gemini_client.models.generate_content(
             model=model,
             contents=prompt
         )
+        print("Gemini API Response Received")
 
         return llm_response.text

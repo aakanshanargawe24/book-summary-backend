@@ -24,7 +24,7 @@ class Book(Base):
     title = Column(String(255), nullable=False)
     total_pages = Column(Integer, nullable=False)
     cover_image_url = Column(Text)
-    is_ready = Column(Text)
+     # is_ready = Column(Text)
     publication_year = Column(Integer)
 
 

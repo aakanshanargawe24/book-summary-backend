@@ -59,8 +59,8 @@ class StagingSectionBuffer(Base):
     )
 
     # FIX: ExtractionJob ke sath multi-directional link maintain kiya
-    job = relationship("ExtractionJob", back_populates="staging_sections")
-
+    # Change "back_populates" to "backref"
+    job = relationship("ExtractionJob", backref="staging_sections")
     __table_args__ = (
         UniqueConstraint(
             "job_id",
