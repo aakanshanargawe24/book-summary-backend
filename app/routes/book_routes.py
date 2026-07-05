@@ -1,13 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    UploadFile,
+    File,
+)
+
+from sqlalchemy import cast
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import cast  # <-- STEP 1: cast import kiya
-from sqlalchemy.dialects.postgresql import UUID  # <-- STEP 2: UUID dialect import kiya
 
 from app.database.connection import get_book_db
-from app.models.book_pages import BookPage
 from app.models.books import Book
 from app.clients.llm import LLMClient
-
+from app.dao.pages_dao import PagesDao
+from app.dao.books_dao import BooksDao
+from app.utils.ocr_utils import OCRUtils
+from app.models.extraction_jobs import ExtractionJob
+from app.dao.extraction_jobs_dao import ExtractionJobDao
 router = APIRouter()
 
 
@@ -17,30 +30,87 @@ def get_books(db: Session = Depends(get_book_db)):
 
 
 @router.post("/")
-def create_book(db: Session = Depends(get_book_db)):
-    return {"message": "Book Created"}
+async def upload_book(
+    file: UploadFile = File(...),        # <-- Added the missing comma here
+    db: Session = Depends(get_book_db)   # <-- This is now syntactically perfect
+):
+    # Create temp folder if it doesn't exist
+    os.makedirs("temp", exist_ok=True)
+
+    # Save uploaded PDF
+    file_path = f"temp/{file.filename}"
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    # Read PDF using OCR utility
+    pages = OCRUtils.pdf_to_pages(file_path)
+    book = Book(
+        author_id="d0f8e70f-0680-4455-beda-e27539ad8788",
+        title=file.filename.replace(".pdf", ""),
+        total_pages=len(pages)
+    )
+
+    book = BooksDao.create_book(
+        db=db,
+        book=book
+    )
+    PagesDao.save_pages(
+        db=db,
+        book_id=book.id,
+        pages=pages
+    )
+    job = ExtractionJob(
+        book_id=book.id
+    )
+
+    ExtractionJobDao.create_job(
+        db=db,
+        job=job
+    )
+    return {
+        "message": "Book Created Successfully",
+        "book_id": str(book.id),
+        "title": book.title,
+        "total_pages": book.total_pages
+    }
+
 
 
 @router.put("/{book_id}")
-def update_book(book_id: str, db: Session = Depends(get_book_db)):
-    return {"message": f"Book {book_id} Updated"}
+def update_book(
+    book_id: str,
+    db: Session = Depends(get_book_db)
+):
+    return {
+        "message": f"Book {book_id} Updated"
+    }
 
 
 @router.delete("/{book_id}")
-def delete_book(book_id: str, db: Session = Depends(get_book_db)):
-    return {"message": f"Book {book_id} Deleted"}
+def delete_book(
+    book_id: str,
+    db: Session = Depends(get_book_db)
+):
+    return {
+        "message": f"Book {book_id} Deleted"
+    }
 
 
 @router.post("/{book_id}/generate-summary")
 async def generate_summary(
-        book_id: str,
-        db: Session = Depends(get_book_db)
+    book_id: str,
+    db: Session = Depends(get_book_db)
 ):
+
     print("Database session created")
 
-    # Step 1: Check if book exists using explicit cast
-    # (Yeh string book_id ko safely database driver ke liye native UUID mein cast karega)
-    book = db.query(Book).filter(Book.id == cast(book_id, UUID)).first()
+    book = (
+        db.query(Book)
+        .filter(Book.id == cast(book_id, UUID))
+        .first()
+    )
+
     print("Book fetched from database")
 
     if not book:
@@ -49,15 +119,11 @@ async def generate_summary(
             detail="Book not found"
         )
 
-    # Step 2: Fetch all pages using explicit cast
-    pages = (
-        db.query(BookPage)
-        .filter(BookPage.book_id == cast(book_id, UUID))
-        .order_by(BookPage.page_number)
-        .all()
+    pages = PagesDao.get_book_details(
+        db,
+        book_id
     )
 
-    # Step 3: Combine raw content
     book_text = "\n".join(
         page.raw_content or ""
         for page in pages
@@ -69,21 +135,24 @@ async def generate_summary(
             detail="This book has no page content to summarize."
         )
 
-    # Step 4: Call Gemini
     try:
+
         llm_client = LLMClient()
+
         summary = llm_client.generate_content(
             prompt=f"Summarize the following book concisely:\n\n{book_text}"
         )
+
     except Exception as llm_err:
+
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to generate summary via Gemini: {str(llm_err)}"
         )
 
-    # Step 5: Return response
     return {
+        "message": "Book Created Successfully",
         "book_id": str(book.id),
         "title": book.title,
-        "summary": summary
+        "total_pages": book.total_pages
     }

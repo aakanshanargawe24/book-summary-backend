@@ -120,7 +120,7 @@ CREATE TABLE extraction_jobs (
 );
 
 -- Tracking processing states for the macro objects independently
-CREATE TABLE job_component_logs (
+CREATE TABLE job_components_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_id UUID NOT NULL REFERENCES extraction_jobs(id) ON DELETE CASCADE,
     layer_type VARCHAR(20) NOT NULL, -- 'paragraph', 'section', 'chapter'

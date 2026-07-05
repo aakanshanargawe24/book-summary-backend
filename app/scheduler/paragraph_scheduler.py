@@ -1,31 +1,46 @@
+
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import func
 
 from app.database.connection import BookSessionLocal
-from app.models.books import Book
-
+from app.dao.extraction_jobs_dao import ExtractionJobDao
+from app.scheduler.extractor_manager import ExtractionManager
+import threading
 scheduler = BackgroundScheduler()
 
 
-def log_book_count():
+def process_extraction_jobs():
 
     with BookSessionLocal() as book_db:
 
         try:
-            total_books = book_db.query(
-                func.count(Book.id)
-            ).scalar()
 
-            print(f"[Scheduler] Total Books: {total_books}")
+            jobs = ExtractionJobDao.get_all_jobs(book_db)
 
+            for job in jobs:
+
+                print(
+                    f"Book: {job.book_id} | "
+                    f"Status: {job.current_status}"
+                )
+
+                if str(job.current_status).lower().endswith("processing"):
+
+
+                    thread = threading.Thread(
+                        target=ExtractionManager.process_book,
+                        args=(job.book_id,)
+                    )
+
+                    thread.start()
         except Exception as e:
-            print(f"[Scheduler Error] Failed to fetch book count: {e}")
+
+            print(f"[Scheduler Error] {e}")
 
 
 def start_scheduler():
 
     scheduler.add_job(
-        log_book_count,
+        process_extraction_jobs,
         trigger="interval",
         seconds=10,
         id="book_count_scheduler",
